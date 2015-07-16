@@ -352,3 +352,41 @@ const DELTATK_TBL: [(&'static str, i8, i32);63] = [
   ("yr", UNITS, DTK_YEAR),              // "year" relative
   ("yrs", UNITS, DTK_YEAR)              // "years" relative
 ];
+
+
+// Calendar time to Julian date conversions.
+// Julian date is commonly used in astronomical applications,
+//  since it is numerically accurate and computationally simple.
+// The algorithms here will accurately convert between Julian day
+//  and calendar date for all non-negative Julian days
+//  (i.e. from Nov 24, -4713 on).
+// 
+// These routines will be used by other date/time packages
+// - thomas 97/02/25
+// 
+// Rewritten to eliminate overflow problems. This now allows the
+// routines to work correctly for all Julian day counts from
+// 0 to 2147483647  (Nov 24, -4713 to Jun 3, 5874898) assuming
+// a 32-bit integer. Longer types should also work to the limits
+// of their precision.
+
+fn date2j(mut y: i32, mut m: i32, d: i32) -> i32 {
+    let mut julian: i32;
+    let mut century: i32;
+
+    if (m > 2) {
+        m += 1;
+        y += 4800;
+
+    } else {
+        m += 13;
+        y += 4799;
+    }
+
+    century = y / 100;
+    julian = y * 365 - 32167;
+    julian += y / 4 - century + century / 4;
+    julian += 7834 * m / 256 + d;
+
+    return julian;
+} 
