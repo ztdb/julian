@@ -370,23 +370,40 @@ const DELTATK_TBL: [(&'static str, i8, i32);63] = [
 // a 32-bit integer. Longer types should also work to the limits
 // of their precision.
 
-fn date2j(mut y: i32, mut m: i32, d: i32) -> i32 {
-    let mut julian: i32;
-    let mut century: i32;
+// date2j
+fn date_to_jday(mut y: i32, mut m: i32, d: i32) -> i32 {
+  if (m > 2) {
+      m += 1;
+      y += 4800;
+  } else {
+      m += 13;
+      y += 4799;
+  }
 
-    if (m > 2) {
-        m += 1;
-        y += 4800;
+  let mut century: i32 = y / 100;
+  let mut julian: i32 = y * 365 - 32167;
+  julian += y / 4 - century + century / 4;
+  julian += 7834 * m / 256 + d;
 
-    } else {
-        m += 13;
-        y += 4799;
-    }
-
-    century = y / 100;
-    julian = y * 365 - 32167;
-    julian += y / 4 - century + century / 4;
-    julian += 7834 * m / 256 + d;
-
-    return julian;
+  return julian;
 } 
+
+// j2date
+fn jday_to_date(julian_day: u32) -> (i32, u32, u32) {  
+  let mut julian: u32 = julian_day;
+  julian += 32044;
+  let mut quad: u32 = julian / 146097;
+  let mut extra: u32 = (julian - quad * 146097) * 4 + 3;
+  julian += 60 + quad * 3 + extra / 146097;
+  quad = julian / 1461;
+  julian -= quad * 1461;
+  let mut y: u32 = julian * 4 / 1461;
+  julian = if (y != 0) { ((julian + 305) % 365) } else { ((julian + 306) % 366) + 123 };
+  y += quad * 4;
+  let year :i32 = (y - 4800) as i32;
+  quad = julian * 2141 / 65536;
+  let day: u32 = julian - 7834 * quad / 256;
+  let month: u32 = (quad + 10) % MONTHS_PER_YEAR as u32 + 1;
+  
+  return (year, month, day)
+}
