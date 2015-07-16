@@ -1,0 +1,16 @@
+[package]
+
+name = "Julian"
+description = "Date/Time Library specialized for data processing"
+version = "0.0.1"
+authors = [ "Hyunsik Choi <hyunsik@apache.org>" ]
+license = "Apache-2.0"
+keywords = ["Datetime", "Date", "Time", "Timestamp"]
+
+[lib]
+name = "julian"
+path = "src/lib.rs"
+
+[dependencies]
+tz = "*"
+log = "*"
