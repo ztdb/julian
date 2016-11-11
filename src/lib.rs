@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // ---------------------------------------------------------------------------
 // Ported from datetime.h
 // ---------------------------------------------------------------------------
@@ -5,9 +6,9 @@
 
 // ----------------------------------------------------------------
 //              time types + support macros
-// 
+//
 // String definitions for standard time quantities.
-// 
+//
 // These strings are the defaults used to form output time strings.
 // Other alternative forms are hardcoded into token tables in datetime.c.
 // ----------------------------------------------------------------
@@ -41,7 +42,7 @@ const DB_C       :&'static str = "bc";
 const DTIMEZONE  :&'static str = "timezone";
 
 // Fundamental time field definitions for parsing.
-// 
+//
 // Meridian:  am, pm, or 24-hour style.
 // Millennium: ad, bc
 const AM   :i32 = 0;
@@ -52,10 +53,10 @@ const AD   :i32 = 0;
 const BC   :i32 = 1;
 
 // Field types for time decoding.
-// 
+//
 // Can't have more of these than there are bits in an unsigned int
 // since these are turned into bit masks during parsing and decoding.
-// 
+//
 // Furthermore, the values for YEAR, MONTH, DAY, HOUR, MINUTE, SECOND
 // must be in the range 0..14 so that the associated bitmasks can fit
 // into the left half of an INTERVAL's typmod value.  Since those bits
@@ -68,7 +69,7 @@ const DAY           :i8 = 3;
 const JULIAN        :i8 = 4;
 /// fixed-offset timezone abbreviation
 const TZ            :i8 = 5;
-/// fixed-offset timezone abbrev, DST 
+/// fixed-offset timezone abbrev, DST
 const DTZ           :i8 = 6;
 /// dynamic timezone abbreviation
 const DYNTZ         :i8 = 7;
@@ -100,14 +101,14 @@ const UNKNOWN_FIELD :i8 = 31;
 
 
 // Token field definitions for time parsing and decoding.
-// 
+//
 // Some field type codes (see above) use these as the "value" in datetktbl[].
 // These are also used for bit masks in DecodeDateTime and friends
 //  so actually restrict them to within [0,31] for now.
 // - thomas 97/06/19
 // Not all of these fields are used for masks in DecodeDateTime
 //  so allow some larger than 31. - thomas 1997-11-17
-// 
+//
 // Caution: there are undocumented assumptions in the code that most of these
 // values are not equal to IGNORE_DTF nor RESERV.  Be very careful when
 // renumbering values in either of these apparently-independent lists :-(
@@ -213,25 +214,25 @@ const DATEK_TBL: [(&'static str, i8, i32);74] = [
   (EARLY, RESERV, DTK_EARLY),
   (DA_D, ADBC, AD),                     // "ad" for years > 0
   ("allballs", RESERV, DTK_ZULU),       // 00:00:00
-  ("am", AMPM, AM),  
-  ("apr", MONTH, 4),  
-  ("april", MONTH, 4),  
+  ("am", AMPM, AM),
+  ("apr", MONTH, 4),
+  ("april", MONTH, 4),
   ("at", IGNORE_DTF, 0),                // "at" (throwaway)
-  ("aug", MONTH, 8),  
-  ("august", MONTH, 8),  
+  ("aug", MONTH, 8),
+  ("august", MONTH, 8),
   (DB_C, ADBC, BC),                     // "bc" for years <= 0
   (DCURRENT, RESERV, DTK_CURRENT),      // "current" is always now
   ("d", UNITS, DTK_DAY),                // "day of month" for ISO input
-  ("dec", MONTH, 12),  
-  ("december", MONTH, 12),  
+  ("dec", MONTH, 12),
+  ("december", MONTH, 12),
   ("dow", RESERV, DTK_DOW),             // day of week
   ("doy", RESERV, DTK_DOY),             // day of year
-  ("dst", DTZMOD, SECS_PER_HOUR),  
+  ("dst", DTZMOD, SECS_PER_HOUR),
   (EPOCH, RESERV, DTK_EPOCH),           // "epoch" reserved for system epoch time
-  ("feb", MONTH, 2),  
-  ("february", MONTH, 2),  
-  ("fri", DOW, 5),  
-  ("friday", DOW, 5),  
+  ("feb", MONTH, 2),
+  ("february", MONTH, 2),
+  ("fri", DOW, 5),
+  ("friday", DOW, 5),
   ("h", UNITS, DTK_HOUR),               // "hour"
   (LATE, RESERV, DTK_LATE),             // "infinity" reserved for "late time"
   (INVALID, RESERV, DTK_INVALID),       // "invalid" reserved for bad time
@@ -247,41 +248,41 @@ const DATEK_TBL: [(&'static str, i8, i32);74] = [
   ("jun", MONTH, 6),
   ("june", MONTH, 6),
   ("m", UNITS, DTK_MONTH),              // "month" for ISO input
-  ("mar", MONTH, 3),    
-  ("march", MONTH, 3),    
-  ("may", MONTH, 5),    
+  ("mar", MONTH, 3),
+  ("march", MONTH, 3),
+  ("may", MONTH, 5),
   ("mm", UNITS, DTK_MINUTE),            // "minute" for ISO input
-  ("mon", DOW, 1),       
-  ("monday", DOW, 1),       
-  ("nov", MONTH, 11),       
-  ("november", MONTH, 11),       
+  ("mon", DOW, 1),
+  ("monday", DOW, 1),
+  ("nov", MONTH, 11),
+  ("november", MONTH, 11),
   (NOW, RESERV, DTK_NOW),               // current transaction time
-  ("oct", MONTH, 10),       
-  ("october", MONTH, 10),       
+  ("oct", MONTH, 10),
+  ("october", MONTH, 10),
   ("on", IGNORE_DTF, 0),                // "on" (throwaway)
-  ("pm", AMPM, PM),       
+  ("pm", AMPM, PM),
   ("s", UNITS, DTK_SECOND),             // "seconds" for ISO input
-  ("sat", DOW, 6),       
-  ("saturday", DOW, 6),       
-  ("sep", MONTH, 9),       
-  ("sept", MONTH, 9),       
-  ("september", MONTH, 9),       
-  ("sun", DOW, 0),       
-  ("sunday", DOW, 0),       
+  ("sat", DOW, 6),
+  ("saturday", DOW, 6),
+  ("sep", MONTH, 9),
+  ("sept", MONTH, 9),
+  ("september", MONTH, 9),
+  ("sun", DOW, 0),
+  ("sunday", DOW, 0),
   ("t", ISOTIME, DTK_TIME),             // Filler for ISO time fields
-  ("thu", DOW, 4),       
-  ("thur", DOW, 4),   
-  ("thurs", DOW, 4),   
-  ("thursday", DOW, 4),   
+  ("thu", DOW, 4),
+  ("thur", DOW, 4),
+  ("thurs", DOW, 4),
+  ("thursday", DOW, 4),
   (TODAY, RESERV, DTK_TODAY),           // midnight
   (TOMORROW, RESERV, DTK_TOMORROW),     // tomorrow midnight
-  ("tue", DOW, 2),   
-  ("tues", DOW, 2),   
-  ("tuesday", DOW, 2),   
+  ("tue", DOW, 2),
+  ("tues", DOW, 2),
+  ("tuesday", DOW, 2),
   ("undefined", RESERV, DTK_INVALID),   // pre-v6.1 invalid time
-  ("wed", DOW, 3),   
-  ("wednesday", DOW, 3),   
-  ("weds", DOW, 3),   
+  ("wed", DOW, 3),
+  ("wednesday", DOW, 3),
+  ("weds", DOW, 3),
   ("y", UNITS, DTK_YEAR),               // "year" for ISO input
   (YESTERDAY, RESERV, DTK_YESTERDAY)    // yesterday midnight
 ];
@@ -354,25 +355,23 @@ const DELTATK_TBL: [(&'static str, i8, i32);63] = [
 ];
 
 
-// Calendar time to Julian date conversions.
-// Julian date is commonly used in astronomical applications,
-//  since it is numerically accurate and computationally simple.
-// The algorithms here will accurately convert between Julian day
-//  and calendar date for all non-negative Julian days
-//  (i.e. from Nov 24, -4713 on).
-// 
-// These routines will be used by other date/time packages
-// - thomas 97/02/25
-// 
-// Rewritten to eliminate overflow problems. This now allows the
-// routines to work correctly for all Julian day counts from
-// 0 to 2147483647  (Nov 24, -4713 to Jun 3, 5874898) assuming
-// a 32-bit integer. Longer types should also work to the limits
-// of their precision.
-
-// date2j
-fn date_to_jday(mut y: i32, mut m: i32, d: i32) -> i32 {
-  if (m > 2) {
+/// Calendar time to Julian date conversions.
+/// Julian date is commonly used in astronomical applications,
+///  since it is numerically accurate and computationally simple.
+/// The algorithms here will accurately convert between Julian day
+///  and calendar date for all non-negative Julian days
+///  (i.e. from Nov 24, -4713 on).
+///
+/// These routines will be used by other date/time packages
+/// - thomas 97/02/25
+///
+/// Rewritten to eliminate overflow problems. This now allows the
+/// routines to work correctly for all Julian day counts from
+/// 0 to 2147483647  (Nov 24, -4713 to Jun 3, 5874898) assuming
+/// a 32-bit integer. Longer types should also work to the limits
+/// of their precision.
+pub fn date2j(mut y: i32, mut m: i32, d: i32) -> i32 {
+  if m > 2 {
       m += 1;
       y += 4800;
   } else {
@@ -380,30 +379,63 @@ fn date_to_jday(mut y: i32, mut m: i32, d: i32) -> i32 {
       y += 4799;
   }
 
-  let mut century: i32 = y / 100;
+  let century: i32 = y / 100;
   let mut julian: i32 = y * 365 - 32167;
   julian += y / 4 - century + century / 4;
   julian += 7834 * m / 256 + d;
 
-  return julian;
-} 
+  julian
+}
 
-// j2date
-fn jday_to_date(julian_day: u32) -> (i32, u32, u32) {  
+fn j2date(julian_day: u32) -> (i32, u32, u32) {
   let mut julian: u32 = julian_day;
   julian += 32044;
   let mut quad: u32 = julian / 146097;
-  let mut extra: u32 = (julian - quad * 146097) * 4 + 3;
+  let extra: u32 = (julian - quad * 146097) * 4 + 3;
   julian += 60 + quad * 3 + extra / 146097;
   quad = julian / 1461;
   julian -= quad * 1461;
   let mut y: u32 = julian * 4 / 1461;
-  julian = if (y != 0) { ((julian + 305) % 365) } else { ((julian + 306) % 366) + 123 };
+
+  julian = if y != 0 {
+    ((julian + 305) % 365)
+  } else {
+    ((julian + 306) % 366) + 123
+  };
+
   y += quad * 4;
   let year :i32 = (y - 4800) as i32;
   quad = julian * 2141 / 65536;
   let day: u32 = julian - 7834 * quad / 256;
   let month: u32 = (quad + 10) % MONTHS_PER_YEAR as u32 + 1;
-  
-  return (year, month, day)
+
+  (year, month, day)
+}
+
+
+/// j2day - convert Julian date to day-of-week (0..6 == Sun..Sat)
+///
+/// Note: various places use the locution j2day(date - 1) to produce a
+/// result according to the convention 0..6 = Mon..Sun.  This is a bit of
+/// a crock, but will work as long as the computation here is just a modulo.
+pub fn j2day(mut date: i32) -> i32 {
+  date += 1;
+  date %= 7;
+
+  if date < 0 {
+    date += 7;
+  }
+
+  date
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_j2day() {
+    let jd = date2j(2016, 11, 11);
+    assert_eq!(5, j2day(jd));
+  }
 }
