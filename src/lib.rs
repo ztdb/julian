@@ -1,4 +1,7 @@
 #![allow(dead_code)]
+use std::fmt;
+use std::str::FromStr;
+
 // ---------------------------------------------------------------------------
 // Ported from datetime.h
 // ---------------------------------------------------------------------------
@@ -112,7 +115,6 @@ const UNKNOWN_FIELD :i8 = 31;
 // Caution: there are undocumented assumptions in the code that most of these
 // values are not equal to IGNORE_DTF nor RESERV.  Be very careful when
 // renumbering values in either of these apparently-independent lists :-(
-
 const DTK_NUMBER     :i32 = 0;
 const DTK_STRING     :i32 = 1;
 
@@ -429,9 +431,46 @@ pub fn j2day(mut date: i32) -> i32 {
   date
 }
 
+#[derive(PartialEq, Eq)]
+pub enum DateTimeError {
+  BadFormat(String)
+}
+
+impl fmt::Debug for DateTimeError {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match *self {
+      DateTimeError::BadFormat(ref s) => write!(f, "{}", s)
+    }
+  }
+}
+
+pub fn parse_fractional_second(cp: &str) -> Result<i64, DateTimeError> {
+  debug_assert!(cp.len() > 1);
+  debug_assert!(cp.as_bytes()[0] == b'.');
+
+  let part = &cp[1..];
+  match i64::from_str(part) {
+    Ok(frac) => Ok(frac * 1000000),
+    Err(e) => Err(DateTimeError::BadFormat(format!("{}: '{}'", e, cp)))
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
+  use super::DateTimeError::*;
+
+  #[test]
+  fn test_parse_fractional_second() {
+    assert_eq!(12345000000i64, parse_fractional_second(".12345").ok().unwrap());
+  }
+
+  #[test]
+  fn test_parse_fractional_second_fail1() {
+    let err = parse_fractional_second(".inv").err().unwrap();
+    assert_eq!(BadFormat("invalid digit found in string: '.inv'".to_owned()),
+      err);
+  }
 
   #[test]
   fn test_j2day() {
