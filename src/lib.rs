@@ -218,34 +218,36 @@ const DAYS: [&'static str;7] = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 ];
 
-const DATEK_TBL: [(&'static [u8], i8, i32);74] = [
+pub type DateToken = (&'static [u8], i8, i32);
+
+const DATEK_TBL: [DateToken;74] = [
   (EARLY, RESERV, DTK_EARLY),
   (DA_D, ADBC, AD),                     // "ad" for years > 0
-  (b"allballs", RESERV, DTK_ZULU),       // 00:00:00
+  (b"allballs", RESERV, DTK_ZULU),      // 00:00:00
   (b"am", AMPM, AM),
   (b"apr", MONTH, 4),
   (b"april", MONTH, 4),
-  (b"at", IGNORE_DTF, 0),                // "at" (throwaway)
+  (b"at", IGNORE_DTF, 0),               // "at" (throwaway)
   (b"aug", MONTH, 8),
   (b"august", MONTH, 8),
   (DB_C, ADBC, BC),                     // "bc" for years <= 0
   (DCURRENT, RESERV, DTK_CURRENT),      // "current" is always now
-  (b"d", UNITS, DTK_DAY),                // "day of month" for ISO input
+  (b"d", UNITS, DTK_DAY),               // "day of month" for ISO input
   (b"dec", MONTH, 12),
   (b"december", MONTH, 12),
-  (b"dow", RESERV, DTK_DOW),             // day of week
-  (b"doy", RESERV, DTK_DOY),             // day of year
+  (b"dow", RESERV, DTK_DOW),            // day of week
+  (b"doy", RESERV, DTK_DOY),            // day of year
   (b"dst", DTZMOD, SECS_PER_HOUR),
   (EPOCH, RESERV, DTK_EPOCH),           // "epoch" reserved for system epoch time
   (b"feb", MONTH, 2),
   (b"february", MONTH, 2),
   (b"fri", DOW, 5),
   (b"friday", DOW, 5),
-  (b"h", UNITS, DTK_HOUR),               // "hour"
+  (b"h", UNITS, DTK_HOUR),              // "hour"
   (LATE, RESERV, DTK_LATE),             // "infinity" reserved for "late time"
   (INVALID, RESERV, DTK_INVALID),       // "invalid" reserved for bad time
-  (b"isodow", RESERV, DTK_ISODOW),       // ISO day of week, Sunday == 7
-  (b"isoyear", UNITS, DTK_ISOYEAR),      // year in terms of the ISO week date
+  (b"isodow", RESERV, DTK_ISODOW),      // ISO day of week, Sunday == 7
+  (b"isoyear", UNITS, DTK_ISOYEAR),     // year in terms of the ISO week date
   (b"j", UNITS, DTK_JULIAN),
   (b"jan", MONTH, 1),
   (b"january", MONTH, 1),
@@ -264,7 +266,7 @@ const DATEK_TBL: [(&'static [u8], i8, i32);74] = [
   (b"monday", DOW, 1),
   (b"nov", MONTH, 11),
   (b"november", MONTH, 11),
-  (NOW, RESERV, DTK_NOW),               // current transaction time
+  (NOW, RESERV, DTK_NOW),                // current transaction time
   (b"oct", MONTH, 10),
   (b"october", MONTH, 10),
   (b"on", IGNORE_DTF, 0),                // "on" (throwaway)
@@ -282,8 +284,8 @@ const DATEK_TBL: [(&'static [u8], i8, i32);74] = [
   (b"thur", DOW, 4),
   (b"thurs", DOW, 4),
   (b"thursday", DOW, 4),
-  (TODAY, RESERV, DTK_TODAY),           // midnight
-  (TOMORROW, RESERV, DTK_TOMORROW),     // tomorrow midnight
+  (TODAY, RESERV, DTK_TODAY),            // midnight
+  (TOMORROW, RESERV, DTK_TOMORROW),      // tomorrow midnight
   (b"tue", DOW, 2),
   (b"tues", DOW, 2),
   (b"tuesday", DOW, 2),
@@ -292,44 +294,44 @@ const DATEK_TBL: [(&'static [u8], i8, i32);74] = [
   (b"wednesday", DOW, 3),
   (b"weds", DOW, 3),
   (b"y", UNITS, DTK_YEAR),               // "year" for ISO input
-  (YESTERDAY, RESERV, DTK_YESTERDAY)    // yesterday midnight
+  (YESTERDAY, RESERV, DTK_YESTERDAY)     // yesterday midnight
 ];
 
 
-const DELTATK_TBL: [(&'static [u8], i8, i32);63] = [
+const DELTATK_TBL: [DateToken;63] = [
   (b"@", IGNORE_DTF, 0),                 // postgres relative prefix
-  (DAGO, AGO, 0),                       // "ago" indicates negative time offset
+  (DAGO, AGO, 0),                        // "ago" indicates negative time offset
   (b"c", UNITS, DTK_CENTURY),            // "century" relative
   (b"cent", UNITS, DTK_CENTURY),         // "century" relative
   (b"centuries", UNITS, DTK_CENTURY),    // "centuries" relative
-  (DCENTURY, UNITS, DTK_CENTURY),       // "century" relative
+  (DCENTURY, UNITS, DTK_CENTURY),        // "century" relative
   (b"d", UNITS, DTK_DAY),                // "day" relative
-  (DDAY, UNITS, DTK_DAY),               // "day" relative
+  (DDAY, UNITS, DTK_DAY),                // "day" relative
   (b"days", UNITS, DTK_DAY),             // "days" relative
   (b"dec", UNITS, DTK_DECADE),           // "decade" relative
-  (DDECADE, UNITS, DTK_DECADE),         // "decade" relative
+  (DDECADE, UNITS, DTK_DECADE),          // "decade" relative
   (b"decades", UNITS, DTK_DECADE),       // "decades" relative
   (b"decs", UNITS, DTK_DECADE),          // "decades" relative
   (b"h", UNITS, DTK_HOUR),               // "hour" relative
-  (DHOUR, UNITS, DTK_HOUR),             // "hour" relative
+  (DHOUR, UNITS, DTK_HOUR),              // "hour" relative
   (b"hours", UNITS, DTK_HOUR),           // "hours" relative
   (b"hr", UNITS, DTK_HOUR),              // "hour" relative
   (b"hrs", UNITS, DTK_HOUR),             // "hours" relative
-  (INVALID, RESERV, DTK_INVALID),       // reserved for invalid time
+  (INVALID, RESERV, DTK_INVALID),        // reserved for invalid time
   (b"m", UNITS, DTK_MINUTE),             // "minute" relative
   (b"microsecon", UNITS, DTK_MICROSEC),  // "microsecond" relative
   (b"mil", UNITS, DTK_MILLENNIUM),       // "millennium" relative
   (b"millennia", UNITS, DTK_MILLENNIUM), // "millennia" relative
-  (DMILLENNIUM, UNITS, DTK_MILLENNIUM), // "millennium" relative
+  (DMILLENNIUM, UNITS, DTK_MILLENNIUM),  // "millennium" relative
   (b"millisecon", UNITS, DTK_MILLISEC),  // relative
   (b"mils", UNITS, DTK_MILLENNIUM),      // "millennia" relative
   (b"min", UNITS, DTK_MINUTE),           // "minute" relative
   (b"mins", UNITS, DTK_MINUTE),          // "minutes" relative
-  (DMINUTE, UNITS, DTK_MINUTE),         // "minute" relative
+  (DMINUTE, UNITS, DTK_MINUTE),          // "minute" relative
   (b"minutes", UNITS, DTK_MINUTE),       // "minutes" relative
   (b"mon", UNITS, DTK_MONTH),            // "months" relative
   (b"mons", UNITS, DTK_MONTH),           // "months" relative
-  (DMONTH, UNITS, DTK_MONTH),           // "month" relative
+  (DMONTH, UNITS, DTK_MONTH),            // "month" relative
   (b"months", UNITS, DTK_MONTH),
   (b"ms", UNITS, DTK_MILLISEC),
   (b"msec", UNITS, DTK_MILLISEC),
@@ -337,26 +339,26 @@ const DELTATK_TBL: [(&'static [u8], i8, i32);63] = [
   (b"mseconds", UNITS, DTK_MILLISEC),
   (b"msecs", UNITS, DTK_MILLISEC),
   (b"qtr", UNITS, DTK_QUARTER),          // "quarter" relative
-  (DQUARTER, UNITS, DTK_QUARTER),       // "quarter" relative
+  (DQUARTER, UNITS, DTK_QUARTER),        // "quarter" relative
   (b"s", UNITS, DTK_SECOND),
   (b"sec", UNITS, DTK_SECOND),
   (DSECOND, UNITS, DTK_SECOND),
   (b"seconds", UNITS, DTK_SECOND),
   (b"secs", UNITS, DTK_SECOND),
-  (DTIMEZONE, UNITS, DTK_TZ),           // "timezone" time offset
+  (DTIMEZONE, UNITS, DTK_TZ),            // "timezone" time offset
   (b"timezone_h", UNITS, DTK_TZ_HOUR),   // timezone hour units
   (b"timezone_m", UNITS, DTK_TZ_MINUTE), // timezone minutes units
   (b"undefined", RESERV, DTK_INVALID),   // pre-v6.1 invalid time
   (b"us", UNITS, DTK_MICROSEC),          // "microsecond" relative
   (b"usec", UNITS, DTK_MICROSEC),        // "microsecond" relative
-  (DMICROSEC, UNITS, DTK_MICROSEC),     // "microsecond" relative
+  (DMICROSEC, UNITS, DTK_MICROSEC),      // "microsecond" relative
   (b"useconds", UNITS, DTK_MICROSEC),    // "microseconds" relative
   (b"usecs", UNITS, DTK_MICROSEC),       // "microseconds" relative
   (b"w", UNITS, DTK_WEEK),               // "week" relative
-  (DWEEK, UNITS, DTK_WEEK),             // "week" relative
+  (DWEEK, UNITS, DTK_WEEK),              // "week" relative
   (b"weeks", UNITS, DTK_WEEK),           // "weeks" relative
   (b"y", UNITS, DTK_YEAR),               // "year" relative
-  (DYEAR, UNITS, DTK_YEAR),             // "year" relative
+  (DYEAR, UNITS, DTK_YEAR),              // "year" relative
   (b"years", UNITS, DTK_YEAR),           // "years" relative
   (b"yr", UNITS, DTK_YEAR),              // "year" relative
   (b"yrs", UNITS, DTK_YEAR)              // "years" relative
@@ -525,6 +527,26 @@ pub fn decode_timezone(tzstr: &str) -> Result<i32, DateTimeParseError> {
   Ok(-tz)
 }
 
+fn datebsearch<'a>(key: &[u8], data: &'a [DateToken]) -> &'a DateToken {
+
+  let mut last = data.len() - 1;
+  let position: usize;
+  let mut result;
+
+  while last >= 0 {
+    position = last >> 1;
+
+    result = key[0] - data[position].0[0];
+    if result == 0 {
+      unimplemented!()
+    }
+
+    break;
+  }
+
+  unimplemented!()
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -572,5 +594,10 @@ mod tests {
       Err(TimezoneOverflow) => {},
       _ => assert!(false, "Overflow must happen")
     };
+  }
+
+  #[test]
+  fn test() {
+    println!("{}", unsafe {::std::str::from_utf8_unchecked(&TBL[0].0)});
   }
 }
