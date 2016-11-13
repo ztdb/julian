@@ -1,6 +1,10 @@
 #![allow(dead_code)]
+extern crate radish;
+
 use std::fmt;
-use std::str::FromStr;
+use std::str::{self, FromStr};
+
+use radish::ascii::strtoi;
 
 // ---------------------------------------------------------------------------
 // Ported from datetime.h
@@ -192,6 +196,8 @@ const USECS_PER_HOUR   :i64 = 3600000000;
 const USECS_PER_MINUTE :i64 = 60000000;
 const USECS_PER_SEC    :i64 = 1000000;
 
+/// maximum allowed hour part
+const MAX_TZDISP_HOUR  : i32 = 15;
 
 // ---------------------------------------------------------------------------
 // Ported from datetime.c
@@ -432,33 +438,95 @@ pub fn j2day(mut date: i32) -> i32 {
 }
 
 #[derive(PartialEq, Eq)]
-pub enum DateTimeError {
-  BadFormat(String)
+pub enum DateTimeParseError {
+  BadFormat(String),
+  TimezoneOverflow
 }
 
-impl fmt::Debug for DateTimeError {
+impl fmt::Debug for DateTimeParseError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match *self {
-      DateTimeError::BadFormat(ref s) => write!(f, "{}", s)
+      DateTimeParseError::BadFormat(ref s) => write!(f, "{}", s),
+      DateTimeParseError::TimezoneOverflow => {
+        write!(f, "overflow or underflow in timezone")
+      }
     }
   }
 }
 
-pub fn parse_fractional_second(cp: &str) -> Result<i64, DateTimeError> {
-  debug_assert!(cp.len() > 1);
-  debug_assert!(cp.as_bytes()[0] == b'.');
+pub fn parse_fractional_second(s: &str) -> Result<i64, DateTimeParseError> {
+  debug_assert!(s.len() > 1);
+  debug_assert!(s.as_bytes()[0] == b'.');
 
-  let part = &cp[1..];
+  let part = &s[1..];
   match i64::from_str(part) {
     Ok(frac) => Ok(frac * 1000000),
-    Err(e) => Err(DateTimeError::BadFormat(format!("{}: '{}'", e, cp)))
+    Err(e) => Err(DateTimeParseError::BadFormat(format!("{}: '{}'", e, s)))
   }
+}
+
+pub fn decode_timezone(tzstr: &str) -> Result<i32, DateTimeParseError> {
+  let buf = tzstr.as_bytes();
+  let mut hr: i32;
+  let min;
+  let mut remains;
+  let mut sec = 0;
+
+  let plus_or_minus = buf[0];
+  if plus_or_minus != b'+' && plus_or_minus != b'-' {
+    return Err(DateTimeParseError::BadFormat(
+      format!("leading characer in timezone must be '+' or '-': '{}'", tzstr)));
+  }
+
+  let r = strtoi(buf, 1);
+  hr = r.0;
+  remains = r.1;
+
+  if remains.is_some() && remains.unwrap()[0] == b':' {
+    let r = strtoi(remains.unwrap(), 1);
+    min = r.0;
+    remains = r.1;
+
+    if remains.is_some() && remains.unwrap()[0] == b':' {
+      let r = strtoi(remains.unwrap(), 1);
+      sec = r.0;
+      remains = r.1;
+    }
+  } else if remains.is_none() && buf.len() > 3 {
+    min = hr % 100;
+    hr = hr / 100;
+  } else {
+    min = 0;
+  }
+
+  if hr < 0 || hr > MAX_TZDISP_HOUR {
+    return Err(DateTimeParseError::TimezoneOverflow);
+  }
+  if min < 0 || min >= MINS_PER_HOUR {
+    return Err(DateTimeParseError::TimezoneOverflow)
+  }
+  if sec < 0 || sec >= SECS_PER_MINUTE {
+    return Err(DateTimeParseError::TimezoneOverflow)
+  }
+
+  let mut tz = (hr * MINS_PER_HOUR + min) * SECS_PER_MINUTE + sec;
+
+  if plus_or_minus == b'-' {
+    tz = -tz;
+  }
+
+  if remains.is_some() {
+    return Err(DateTimeParseError::BadFormat(
+      format!("bad format in timezone: '{}'", tzstr)));
+  }
+
+  Ok(-tz)
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use super::DateTimeError::*;
+  use super::DateTimeParseError::*;
 
   #[test]
   fn test_parse_fractional_second() {
@@ -476,5 +544,31 @@ mod tests {
   fn test_j2day() {
     let jd = date2j(2016, 11, 11);
     assert_eq!(5, j2day(jd));
+  }
+
+  #[test]
+  fn test_decode_timezone() {
+    assert_eq!(-3600, decode_timezone("+1").ok().unwrap());
+    assert_eq!(3600,  decode_timezone("-1").ok().unwrap());
+    assert_eq!(-5400, decode_timezone("+1:30").ok().unwrap());
+    assert_eq!(5400,  decode_timezone("-1:30").ok().unwrap());
+  }
+
+  #[test]
+  fn test_decode_timezone_failure() {
+    match decode_timezone("+17") {
+      Err(TimezoneOverflow) => {},
+      _ => assert!(false, "Overflow must happen")
+    };
+
+    match decode_timezone("+1:60") {
+      Err(TimezoneOverflow) => {},
+      _ => assert!(false, "Overflow must happen")
+    };
+
+    match decode_timezone("+1:0:60") {
+      Err(TimezoneOverflow) => {},
+      _ => assert!(false, "Overflow must happen")
+    };
   }
 }

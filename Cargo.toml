@@ -3,7 +3,7 @@
 name = "Julian"
 description = "Date/Time Library specialized for data processing"
 version = "0.0.1"
-authors = [ "Hyunsik Choi <hyunsik@apache.org>" ]
+authors = [ "Hyunsik Choi <hyunsik@gmail.com>" ]
 license = "Apache-2.0"
 keywords = ["Datetime", "Date", "Time", "Timestamp"]
 
@@ -12,5 +12,7 @@ name = "julian"
 path = "src/lib.rs"
 
 [dependencies]
-tz = "*"
 log = "*"
+
+[dependencies.radish]
+git = "https://github.com/hyunsik/radish.git"
