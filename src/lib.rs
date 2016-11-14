@@ -218,150 +218,164 @@ const DAYS: [&'static str;7] = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 ];
 
-pub type DateToken = (&'static [u8], i8, i32);
+pub struct DateToken {
+  token: &'static [u8],
+  ty: i8,
+  value: i32
+}
+
+macro_rules! token {
+  ($token:expr, $ty:expr, $value:expr) => {
+    DateToken {
+      token: $token,
+      ty: $ty,
+      value: $value
+    }
+  }
+}
 
 const DATEK_TBL: [DateToken;74] = [
-  (EARLY, RESERV, DTK_EARLY),
-  (DA_D, ADBC, AD),                     // "ad" for years > 0
-  (b"allballs", RESERV, DTK_ZULU),      // 00:00:00
-  (b"am", AMPM, AM),
-  (b"apr", MONTH, 4),
-  (b"april", MONTH, 4),
-  (b"at", IGNORE_DTF, 0),               // "at" (throwaway)
-  (b"aug", MONTH, 8),
-  (b"august", MONTH, 8),
-  (DB_C, ADBC, BC),                     // "bc" for years <= 0
-  (DCURRENT, RESERV, DTK_CURRENT),      // "current" is always now
-  (b"d", UNITS, DTK_DAY),               // "day of month" for ISO input
-  (b"dec", MONTH, 12),
-  (b"december", MONTH, 12),
-  (b"dow", RESERV, DTK_DOW),            // day of week
-  (b"doy", RESERV, DTK_DOY),            // day of year
-  (b"dst", DTZMOD, SECS_PER_HOUR),
-  (EPOCH, RESERV, DTK_EPOCH),           // "epoch" reserved for system epoch time
-  (b"feb", MONTH, 2),
-  (b"february", MONTH, 2),
-  (b"fri", DOW, 5),
-  (b"friday", DOW, 5),
-  (b"h", UNITS, DTK_HOUR),              // "hour"
-  (LATE, RESERV, DTK_LATE),             // "infinity" reserved for "late time"
-  (INVALID, RESERV, DTK_INVALID),       // "invalid" reserved for bad time
-  (b"isodow", RESERV, DTK_ISODOW),      // ISO day of week, Sunday == 7
-  (b"isoyear", UNITS, DTK_ISOYEAR),     // year in terms of the ISO week date
-  (b"j", UNITS, DTK_JULIAN),
-  (b"jan", MONTH, 1),
-  (b"january", MONTH, 1),
-  (b"jd", UNITS, DTK_JULIAN),
-  (b"jul", MONTH, 7),
-  (b"julian", UNITS, DTK_JULIAN),
-  (b"july", MONTH, 7),
-  (b"jun", MONTH, 6),
-  (b"june", MONTH, 6),
-  (b"m", UNITS, DTK_MONTH),              // "month" for ISO input
-  (b"mar", MONTH, 3),
-  (b"march", MONTH, 3),
-  (b"may", MONTH, 5),
-  (b"mm", UNITS, DTK_MINUTE),            // "minute" for ISO input
-  (b"mon", DOW, 1),
-  (b"monday", DOW, 1),
-  (b"nov", MONTH, 11),
-  (b"november", MONTH, 11),
-  (NOW, RESERV, DTK_NOW),                // current transaction time
-  (b"oct", MONTH, 10),
-  (b"october", MONTH, 10),
-  (b"on", IGNORE_DTF, 0),                // "on" (throwaway)
-  (b"pm", AMPM, PM),
-  (b"s", UNITS, DTK_SECOND),             // "seconds" for ISO input
-  (b"sat", DOW, 6),
-  (b"saturday", DOW, 6),
-  (b"sep", MONTH, 9),
-  (b"sept", MONTH, 9),
-  (b"september", MONTH, 9),
-  (b"sun", DOW, 0),
-  (b"sunday", DOW, 0),
-  (b"t", ISOTIME, DTK_TIME),             // Filler for ISO time fields
-  (b"thu", DOW, 4),
-  (b"thur", DOW, 4),
-  (b"thurs", DOW, 4),
-  (b"thursday", DOW, 4),
-  (TODAY, RESERV, DTK_TODAY),            // midnight
-  (TOMORROW, RESERV, DTK_TOMORROW),      // tomorrow midnight
-  (b"tue", DOW, 2),
-  (b"tues", DOW, 2),
-  (b"tuesday", DOW, 2),
-  (b"undefined", RESERV, DTK_INVALID),   // pre-v6.1 invalid time
-  (b"wed", DOW, 3),
-  (b"wednesday", DOW, 3),
-  (b"weds", DOW, 3),
-  (b"y", UNITS, DTK_YEAR),               // "year" for ISO input
-  (YESTERDAY, RESERV, DTK_YESTERDAY)     // yesterday midnight
+  token!(EARLY, RESERV, DTK_EARLY),
+  token!(DA_D, ADBC, AD),                     // "ad" for years > 0
+  token!(b"allballs", RESERV, DTK_ZULU),      // 00:00:00
+  token!(b"am", AMPM, AM),
+  token!(b"apr", MONTH, 4),
+  token!(b"april", MONTH, 4),
+  token!(b"at", IGNORE_DTF, 0),               // "at" (throwaway)
+  token!(b"aug", MONTH, 8),
+  token!(b"august", MONTH, 8),
+  token!(DB_C, ADBC, BC),                     // "bc" for years <= 0
+  token!(DCURRENT, RESERV, DTK_CURRENT),      // "current" is always now
+  token!(b"d", UNITS, DTK_DAY),               // "day of month" for ISO input
+  token!(b"dec", MONTH, 12),
+  token!(b"december", MONTH, 12),
+  token!(b"dow", RESERV, DTK_DOW),            // day of week
+  token!(b"doy", RESERV, DTK_DOY),            // day of year
+  token!(b"dst", DTZMOD, SECS_PER_HOUR),
+  token!(EPOCH, RESERV, DTK_EPOCH),           // "epoch" reserved for system epoch time
+  token!(b"feb", MONTH, 2),
+  token!(b"february", MONTH, 2),
+  token!(b"fri", DOW, 5),
+  token!(b"friday", DOW, 5),
+  token!(b"h", UNITS, DTK_HOUR),              // "hour"
+  token!(LATE, RESERV, DTK_LATE),             // "infinity" reserved for "late time"
+  token!(INVALID, RESERV, DTK_INVALID),       // "invalid" reserved for bad time
+  token!(b"isodow", RESERV, DTK_ISODOW),      // ISO day of week, Sunday == 7
+  token!(b"isoyear", UNITS, DTK_ISOYEAR),     // year in terms of the ISO week date
+  token!(b"j", UNITS, DTK_JULIAN),
+  token!(b"jan", MONTH, 1),
+  token!(b"january", MONTH, 1),
+  token!(b"jd", UNITS, DTK_JULIAN),
+  token!(b"jul", MONTH, 7),
+  token!(b"julian", UNITS, DTK_JULIAN),
+  token!(b"july", MONTH, 7),
+  token!(b"jun", MONTH, 6),
+  token!(b"june", MONTH, 6),
+  token!(b"m", UNITS, DTK_MONTH),              // "month" for ISO input
+  token!(b"mar", MONTH, 3),
+  token!(b"march", MONTH, 3),
+  token!(b"may", MONTH, 5),
+  token!(b"mm", UNITS, DTK_MINUTE),            // "minute" for ISO input
+  token!(b"mon", DOW, 1),
+  token!(b"monday", DOW, 1),
+  token!(b"nov", MONTH, 11),
+  token!(b"november", MONTH, 11),
+  token!(NOW, RESERV, DTK_NOW),                // current transaction time
+  token!(b"oct", MONTH, 10),
+  token!(b"october", MONTH, 10),
+  token!(b"on", IGNORE_DTF, 0),                // "on" (throwaway)
+  token!(b"pm", AMPM, PM),
+  token!(b"s", UNITS, DTK_SECOND),             // "seconds" for ISO input
+  token!(b"sat", DOW, 6),
+  token!(b"saturday", DOW, 6),
+  token!(b"sep", MONTH, 9),
+  token!(b"sept", MONTH, 9),
+  token!(b"september", MONTH, 9),
+  token!(b"sun", DOW, 0),
+  token!(b"sunday", DOW, 0),
+  token!(b"t", ISOTIME, DTK_TIME),             // Filler for ISO time fields
+  token!(b"thu", DOW, 4),
+  token!(b"thur", DOW, 4),
+  token!(b"thurs", DOW, 4),
+  token!(b"thursday", DOW, 4),
+  token!(TODAY, RESERV, DTK_TODAY),            // midnight
+  token!(TOMORROW, RESERV, DTK_TOMORROW),      // tomorrow midnight
+  token!(b"tue", DOW, 2),
+  token!(b"tues", DOW, 2),
+  token!(b"tuesday", DOW, 2),
+  token!(b"undefined", RESERV, DTK_INVALID),   // pre-v6.1 invalid time
+  token!(b"wed", DOW, 3),
+  token!(b"wednesday", DOW, 3),
+  token!(b"weds", DOW, 3),
+  token!(b"y", UNITS, DTK_YEAR),               // "year" for ISO input
+  token!(YESTERDAY, RESERV, DTK_YESTERDAY)     // yesterday midnight
 ];
 
 
 const DELTATK_TBL: [DateToken;63] = [
-  (b"@", IGNORE_DTF, 0),                 // postgres relative prefix
-  (DAGO, AGO, 0),                        // "ago" indicates negative time offset
-  (b"c", UNITS, DTK_CENTURY),            // "century" relative
-  (b"cent", UNITS, DTK_CENTURY),         // "century" relative
-  (b"centuries", UNITS, DTK_CENTURY),    // "centuries" relative
-  (DCENTURY, UNITS, DTK_CENTURY),        // "century" relative
-  (b"d", UNITS, DTK_DAY),                // "day" relative
-  (DDAY, UNITS, DTK_DAY),                // "day" relative
-  (b"days", UNITS, DTK_DAY),             // "days" relative
-  (b"dec", UNITS, DTK_DECADE),           // "decade" relative
-  (DDECADE, UNITS, DTK_DECADE),          // "decade" relative
-  (b"decades", UNITS, DTK_DECADE),       // "decades" relative
-  (b"decs", UNITS, DTK_DECADE),          // "decades" relative
-  (b"h", UNITS, DTK_HOUR),               // "hour" relative
-  (DHOUR, UNITS, DTK_HOUR),              // "hour" relative
-  (b"hours", UNITS, DTK_HOUR),           // "hours" relative
-  (b"hr", UNITS, DTK_HOUR),              // "hour" relative
-  (b"hrs", UNITS, DTK_HOUR),             // "hours" relative
-  (INVALID, RESERV, DTK_INVALID),        // reserved for invalid time
-  (b"m", UNITS, DTK_MINUTE),             // "minute" relative
-  (b"microsecon", UNITS, DTK_MICROSEC),  // "microsecond" relative
-  (b"mil", UNITS, DTK_MILLENNIUM),       // "millennium" relative
-  (b"millennia", UNITS, DTK_MILLENNIUM), // "millennia" relative
-  (DMILLENNIUM, UNITS, DTK_MILLENNIUM),  // "millennium" relative
-  (b"millisecon", UNITS, DTK_MILLISEC),  // relative
-  (b"mils", UNITS, DTK_MILLENNIUM),      // "millennia" relative
-  (b"min", UNITS, DTK_MINUTE),           // "minute" relative
-  (b"mins", UNITS, DTK_MINUTE),          // "minutes" relative
-  (DMINUTE, UNITS, DTK_MINUTE),          // "minute" relative
-  (b"minutes", UNITS, DTK_MINUTE),       // "minutes" relative
-  (b"mon", UNITS, DTK_MONTH),            // "months" relative
-  (b"mons", UNITS, DTK_MONTH),           // "months" relative
-  (DMONTH, UNITS, DTK_MONTH),            // "month" relative
-  (b"months", UNITS, DTK_MONTH),
-  (b"ms", UNITS, DTK_MILLISEC),
-  (b"msec", UNITS, DTK_MILLISEC),
-  (DMILLISEC, UNITS, DTK_MILLISEC),
-  (b"mseconds", UNITS, DTK_MILLISEC),
-  (b"msecs", UNITS, DTK_MILLISEC),
-  (b"qtr", UNITS, DTK_QUARTER),          // "quarter" relative
-  (DQUARTER, UNITS, DTK_QUARTER),        // "quarter" relative
-  (b"s", UNITS, DTK_SECOND),
-  (b"sec", UNITS, DTK_SECOND),
-  (DSECOND, UNITS, DTK_SECOND),
-  (b"seconds", UNITS, DTK_SECOND),
-  (b"secs", UNITS, DTK_SECOND),
-  (DTIMEZONE, UNITS, DTK_TZ),            // "timezone" time offset
-  (b"timezone_h", UNITS, DTK_TZ_HOUR),   // timezone hour units
-  (b"timezone_m", UNITS, DTK_TZ_MINUTE), // timezone minutes units
-  (b"undefined", RESERV, DTK_INVALID),   // pre-v6.1 invalid time
-  (b"us", UNITS, DTK_MICROSEC),          // "microsecond" relative
-  (b"usec", UNITS, DTK_MICROSEC),        // "microsecond" relative
-  (DMICROSEC, UNITS, DTK_MICROSEC),      // "microsecond" relative
-  (b"useconds", UNITS, DTK_MICROSEC),    // "microseconds" relative
-  (b"usecs", UNITS, DTK_MICROSEC),       // "microseconds" relative
-  (b"w", UNITS, DTK_WEEK),               // "week" relative
-  (DWEEK, UNITS, DTK_WEEK),              // "week" relative
-  (b"weeks", UNITS, DTK_WEEK),           // "weeks" relative
-  (b"y", UNITS, DTK_YEAR),               // "year" relative
-  (DYEAR, UNITS, DTK_YEAR),              // "year" relative
-  (b"years", UNITS, DTK_YEAR),           // "years" relative
-  (b"yr", UNITS, DTK_YEAR),              // "year" relative
-  (b"yrs", UNITS, DTK_YEAR)              // "years" relative
+  token!(b"@", IGNORE_DTF, 0),                 // postgres relative prefix
+  token!(DAGO, AGO, 0),                        // "ago" indicates negative time offset
+  token!(b"c", UNITS, DTK_CENTURY),            // "century" relative
+  token!(b"cent", UNITS, DTK_CENTURY),         // "century" relative
+  token!(b"centuries", UNITS, DTK_CENTURY),    // "centuries" relative
+  token!(DCENTURY, UNITS, DTK_CENTURY),        // "century" relative
+  token!(b"d", UNITS, DTK_DAY),                // "day" relative
+  token!(DDAY, UNITS, DTK_DAY),                // "day" relative
+  token!(b"days", UNITS, DTK_DAY),             // "days" relative
+  token!(b"dec", UNITS, DTK_DECADE),           // "decade" relative
+  token!(DDECADE, UNITS, DTK_DECADE),          // "decade" relative
+  token!(b"decades", UNITS, DTK_DECADE),       // "decades" relative
+  token!(b"decs", UNITS, DTK_DECADE),          // "decades" relative
+  token!(b"h", UNITS, DTK_HOUR),               // "hour" relative
+  token!(DHOUR, UNITS, DTK_HOUR),              // "hour" relative
+  token!(b"hours", UNITS, DTK_HOUR),           // "hours" relative
+  token!(b"hr", UNITS, DTK_HOUR),              // "hour" relative
+  token!(b"hrs", UNITS, DTK_HOUR),             // "hours" relative
+  token!(INVALID, RESERV, DTK_INVALID),        // reserved for invalid time
+  token!(b"m", UNITS, DTK_MINUTE),             // "minute" relative
+  token!(b"microsecon", UNITS, DTK_MICROSEC),  // "microsecond" relative
+  token!(b"mil", UNITS, DTK_MILLENNIUM),       // "millennium" relative
+  token!(b"millennia", UNITS, DTK_MILLENNIUM), // "millennia" relative
+  token!(DMILLENNIUM, UNITS, DTK_MILLENNIUM),  // "millennium" relative
+  token!(b"millisecon", UNITS, DTK_MILLISEC),  // relative
+  token!(b"mils", UNITS, DTK_MILLENNIUM),      // "millennia" relative
+  token!(b"min", UNITS, DTK_MINUTE),           // "minute" relative
+  token!(b"mins", UNITS, DTK_MINUTE),          // "minutes" relative
+  token!(DMINUTE, UNITS, DTK_MINUTE),          // "minute" relative
+  token!(b"minutes", UNITS, DTK_MINUTE),       // "minutes" relative
+  token!(b"mon", UNITS, DTK_MONTH),            // "months" relative
+  token!(b"mons", UNITS, DTK_MONTH),           // "months" relative
+  token!(DMONTH, UNITS, DTK_MONTH),            // "month" relative
+  token!(b"months", UNITS, DTK_MONTH),
+  token!(b"ms", UNITS, DTK_MILLISEC),
+  token!(b"msec", UNITS, DTK_MILLISEC),
+  token!(DMILLISEC, UNITS, DTK_MILLISEC),
+  token!(b"mseconds", UNITS, DTK_MILLISEC),
+  token!(b"msecs", UNITS, DTK_MILLISEC),
+  token!(b"qtr", UNITS, DTK_QUARTER),          // "quarter" relative
+  token!(DQUARTER, UNITS, DTK_QUARTER),        // "quarter" relative
+  token!(b"s", UNITS, DTK_SECOND),
+  token!(b"sec", UNITS, DTK_SECOND),
+  token!(DSECOND, UNITS, DTK_SECOND),
+  token!(b"seconds", UNITS, DTK_SECOND),
+  token!(b"secs", UNITS, DTK_SECOND),
+  token!(DTIMEZONE, UNITS, DTK_TZ),            // "timezone" time offset
+  token!(b"timezone_h", UNITS, DTK_TZ_HOUR),   // timezone hour units
+  token!(b"timezone_m", UNITS, DTK_TZ_MINUTE), // timezone minutes units
+  token!(b"undefined", RESERV, DTK_INVALID),   // pre-v6.1 invalid time
+  token!(b"us", UNITS, DTK_MICROSEC),          // "microsecond" relative
+  token!(b"usec", UNITS, DTK_MICROSEC),        // "microsecond" relative
+  token!(DMICROSEC, UNITS, DTK_MICROSEC),      // "microsecond" relative
+  token!(b"useconds", UNITS, DTK_MICROSEC),    // "microseconds" relative
+  token!(b"usecs", UNITS, DTK_MICROSEC),       // "microseconds" relative
+  token!(b"w", UNITS, DTK_WEEK),               // "week" relative
+  token!(DWEEK, UNITS, DTK_WEEK),              // "week" relative
+  token!(b"weeks", UNITS, DTK_WEEK),           // "weeks" relative
+  token!(b"y", UNITS, DTK_YEAR),               // "year" relative
+  token!(DYEAR, UNITS, DTK_YEAR),              // "year" relative
+  token!(b"years", UNITS, DTK_YEAR),           // "years" relative
+  token!(b"yr", UNITS, DTK_YEAR),              // "year" relative
+  token!(b"yrs", UNITS, DTK_YEAR)              // "years" relative
 ];
 
 
@@ -536,7 +550,7 @@ fn datebsearch<'a>(key: &[u8], data: &'a [DateToken]) -> &'a DateToken {
   while last >= 0 {
     position = last >> 1;
 
-    result = key[0] - data[position].0[0];
+    result = key[0] - data[position].token[0];
     if result == 0 {
       unimplemented!()
     }
@@ -594,10 +608,5 @@ mod tests {
       Err(TimezoneOverflow) => {},
       _ => assert!(false, "Overflow must happen")
     };
-  }
-
-  #[test]
-  fn test() {
-    println!("{}", unsafe {::std::str::from_utf8_unchecked(&TBL[0].0)});
   }
 }
