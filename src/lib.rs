@@ -2,6 +2,7 @@
 extern crate radish;
 
 use std::fmt;
+use std::cmp::Ordering;
 use std::str::{self, FromStr};
 
 use radish::ascii::strtoi;
@@ -234,7 +235,7 @@ macro_rules! token {
   }
 }
 
-const DATEK_TBL: [DateToken;74] = [
+pub const DATEK_TBL: [DateToken;74] = [
   token!(EARLY, RESERV, DTK_EARLY),
   token!(DA_D, ADBC, AD),                     // "ad" for years > 0
   token!(b"allballs", RESERV, DTK_ZULU),      // 00:00:00
@@ -541,24 +542,39 @@ pub fn decode_timezone(tzstr: &str) -> Result<i32, DateTimeParseError> {
   Ok(-tz)
 }
 
-fn datebsearch<'a>(key: &[u8], data: &'a [DateToken]) -> &'a DateToken {
+/// datebsearch
+/// Binary search -- from Knuth (6.2.1) Algorithm B.  Special case like this
+/// is WAY faster than the generic bsearch().
+pub fn datebsearch<'a>(key: &[u8], data: &'a [DateToken])
+    -> Option<&'a DateToken> {
 
+  let mut base = 0;
   let mut last = data.len() - 1;
-  let position: usize;
-  let mut result;
+  let mut position: usize;
+  let mut result: i32;
 
-  while last >= 0 {
-    position = last >> 1;
+  while last >= base {
+    // get medium position
+    position = base + ((last - base) >> 1);
 
-    result = key[0] - data[position].token[0];
+    // precheck the first character for a bit of extra speed
+    result = ((key[0] as i32) - data[position].token[0] as i32) as i32;
     if result == 0 {
-      unimplemented!()
+      result = match key.cmp(data[position].token) {
+        Ordering::Equal => return Some(&data[position]),
+        Ordering::Less => -1,
+        Ordering::Greater => 1,
+      };
     }
 
-    break;
+    if result < 0 {
+      last = position - 1;
+    } else {
+      base = position + 1;
+    }
   }
 
-  unimplemented!()
+  None
 }
 
 #[cfg(test)]
@@ -608,5 +624,14 @@ mod tests {
       Err(TimezoneOverflow) => {},
       _ => assert!(false, "Overflow must happen")
     };
+  }
+
+  #[test]
+  fn test_datebsearch() {
+    assert_eq!(b"april", datebsearch(b"april", &DATEK_TBL).unwrap().token);
+    assert_eq!(b"monday", datebsearch(b"monday", &DATEK_TBL).unwrap().token);
+    assert_eq!(b"friday", datebsearch(b"friday", &DATEK_TBL).unwrap().token);
+
+    assert!(datebsearch(b"not_found", &DATEK_TBL).is_none());
   }
 }
