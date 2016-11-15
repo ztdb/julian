@@ -5,7 +5,7 @@ use std::fmt;
 use std::cmp::Ordering;
 use std::str::{self, FromStr};
 
-use radish::ascii::strtoi;
+use radish::ascii::{isalnum, isalpha, isdigit, strtoi};
 
 // ---------------------------------------------------------------------------
 // Ported from datetime.h
@@ -163,6 +163,8 @@ const DTK_TZ_MINUTE  :i32 = 35;
 const DTK_ISOYEAR    :i32 = 36;
 const DTK_ISODOW     :i32 = 37;
 
+/* maximum possible number of fields in a date string */
+const MAXDATEFIELDS  :usize	= 25;
 
 // ---------------------------------------------------------------------------
 // Ported from Timestamp.h
@@ -481,6 +483,49 @@ pub fn parse_fractional_second(s: &str) -> Result<i64, DateTimeParseError> {
     Ok(frac) => Ok(frac * 1000000),
     Err(e) => Err(DateTimeParseError::BadFormat(format!("{}: '{}'", e, s)))
   }
+}
+
+/// return (tmask, is2year, year, month, day)
+pub fn decode_date(s: &[u8], fmask: i32) -> Result<(i32, bool, i32, i32, i32), DateTimeParseError> {
+  let len = s.len();
+  let mut idx = 0;
+  let mut fields: Vec<&[u8]> = Vec::with_capacity(MAXDATEFIELDS);
+
+  while idx < len && fields.len() < MAXDATEFIELDS {
+
+    while idx < len && !isalnum(s[idx]) {
+      idx += 1;
+    }
+
+    if idx == len {
+      return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+        unsafe { str::from_utf8_unchecked(s) })));
+    }
+
+    let field_start_idx = idx;
+    if isdigit(s[idx]) {
+      while idx < len && isdigit(s[idx]) {
+        idx += 1;
+      }
+    } else if isalpha(s[idx]) {
+      while idx < len && isalpha(s[idx]) {
+        idx += 1;
+      }
+    }
+    fields.push(&s[field_start_idx .. idx]);
+  }
+
+  for i in 0..fields.len() {
+    if isalpha(fields[0][0]) {
+      // ...
+    }
+  }
+
+  for i in 0..fields.len() {
+
+  }
+
+  unimplemented!()
 }
 
 /// Parse a string to a timezone in seconds.
