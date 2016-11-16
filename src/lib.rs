@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 #![feature(const_fn)]
-#[macro_use] extern crate bitflags;
 extern crate radish;
 
 use std::fmt;
@@ -170,12 +169,14 @@ const fn DTK_M(token: i8) -> i32 {
   (0x01 << token)
 }
 
-const DTK_ALL_SECS_M  :i32 = (DTK_M(SECOND) | DTK_M(MILLISECOND) | DTK_M(MICROSECOND));
-const DTK_DATE_M      :i32 = (DTK_M(YEAR) | DTK_M(MONTH) | DTK_M(DAY));
-const DTK_YEAR_M      :i32 = DTK_M(YEAR);
-const DTK_MONTH_M     :i32 = DTK_M(MONTH);
-const DTK_DAY_M       :i32 = DTK_M(DAY);
-const DTK_TIME_M      :i32 = (DTK_M(HOUR) | DTK_M(MINUTE) | DTK_ALL_SECS_M);
+const DTK_ALL_SECS_M   :i32 = (DTK_M(SECOND) | DTK_M(MILLISECOND) | DTK_M(MICROSECOND));
+const DTK_YEAR_M       :i32 = DTK_M(YEAR);
+const DTK_MONTH_M      :i32 = DTK_M(MONTH);
+const DTK_DAY_M        :i32 = DTK_M(DAY);
+const DTK_YEAR_MONTH_M :i32 = (DTK_M(YEAR) | DTK_M(MONTH));
+const DTK_MONTH_DAY_M  :i32 = (DTK_M(MONTH) | DTK_M(DAY));
+const DTK_DATE_M       :i32 = (DTK_M(YEAR) | DTK_M(MONTH) | DTK_M(DAY));
+const DTK_TIME_M       :i32 = (DTK_M(HOUR) | DTK_M(MINUTE) | DTK_ALL_SECS_M);
 
 /* maximum possible number of fields in a date string */
 const MAXDATEFIELDS  :usize	= 25;
@@ -565,6 +566,13 @@ fn decode_number(flen: i32, s: &[u8], has_text_month: bool, fmask: i32)
 
   /* Switch based on what we have so far */
 	match fmask & DTK_DATE_M {
+    0 => {}
+    DTK_YEAR_M => {}
+    DTK_MONTH_M => {}
+    DTK_YEAR_MONTH_M => {}
+    DTK_DAY_M => {}
+    DTK_MONTH_DAY_M => {}
+    DTK_DATE_M => {}
     _ => return Err(DateTimeParseError::BadFormat(format!("..")))
   };
 
