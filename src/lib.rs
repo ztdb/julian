@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+#![feature(const_fn)]
+#[macro_use] extern crate bitflags;
 extern crate radish;
 
 use std::fmt;
@@ -162,6 +164,18 @@ const DTK_TZ_HOUR    :i32 = 34;
 const DTK_TZ_MINUTE  :i32 = 35;
 const DTK_ISOYEAR    :i32 = 36;
 const DTK_ISODOW     :i32 = 37;
+
+#[allow(non_snake_case)]
+const fn DTK_M(token: i8) -> i32 {
+  (0x01 << token)
+}
+
+const DTK_ALL_SECS_M  :i32 = (DTK_M(SECOND) | DTK_M(MILLISECOND) | DTK_M(MICROSECOND));
+const DTK_DATE_M      :i32 = (DTK_M(YEAR) | DTK_M(MONTH) | DTK_M(DAY));
+const DTK_YEAR_M      :i32 = DTK_M(YEAR);
+const DTK_MONTH_M     :i32 = DTK_M(MONTH);
+const DTK_DAY_M       :i32 = DTK_M(DAY);
+const DTK_TIME_M      :i32 = (DTK_M(HOUR) | DTK_M(MINUTE) | DTK_ALL_SECS_M);
 
 /* maximum possible number of fields in a date string */
 const MAXDATEFIELDS  :usize	= 25;
@@ -524,6 +538,35 @@ pub fn decode_date(s: &[u8], fmask: i32) -> Result<(i32, bool, i32, i32, i32), D
   for i in 0..fields.len() {
 
   }
+
+  unimplemented!()
+}
+
+/// return tmask, fsec, is2digits
+fn decode_number(flen: i32, s: &[u8], has_text_month: bool, fmask: i32)
+    -> Result<(i32, i64, bool), DateTimeParseError> {
+  let mut tmask: i32 = 0;
+
+  let (val, remain) = strtoi(s, 0);
+
+  if remain.is_some() && remain.unwrap()[0] == b'.' {
+
+  } else if remain.is_some() {
+    // error case
+  }
+
+  // Special case for day of year
+  if flen == 3 && (fmask & DTK_DATE_M) == DTK_M(YEAR) &&
+     val > 1 && val <= 366 {
+    tmask = (DTK_M(DOY) | DTK_M(MONTH) | DTK_M(DAY));
+    // tm->tm_yday = val;
+    // return succhess
+  }
+
+  /* Switch based on what we have so far */
+	match fmask & DTK_DATE_M {
+    _ => return Err(DateTimeParseError::BadFormat(format!("..")))
+  };
 
   unimplemented!()
 }
