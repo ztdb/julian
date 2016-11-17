@@ -6,7 +6,8 @@ use std::fmt;
 use std::cmp::Ordering;
 use std::str::{self, FromStr};
 
-use radish::ascii::{isalnum, isalpha, isdigit, strtoi};
+use radish::err::ParseNumErr;
+use radish::ascii::{FromBytes, isalnum, isalpha, isdigit, strtod, strtoi};
 
 // ---------------------------------------------------------------------------
 // Ported from datetime.h
@@ -488,6 +489,12 @@ impl fmt::Debug for DateTimeParseError {
   }
 }
 
+impl From<ParseNumErr> for DateTimeParseError {
+  fn from(e: ParseNumErr) -> Self {
+    DateTimeParseError::BadFormat(format!("{}", e))
+  }
+}
+
 /// Parse a string to a fractional second.
 pub fn parse_fractional_second(s: &str) -> Result<i64, DateTimeParseError> {
   debug_assert!(s.len() > 1);
@@ -546,10 +553,10 @@ pub fn decode_date(s: &[u8], fmask: i32) -> Result<(i32, bool, i32, i32, i32), D
 /// return tmask, fsec, is2digits
 fn decode_number(flen: i32, s: &[u8], has_text_month: bool, fmask: i32)
     -> Result<(i32, i64, bool), DateTimeParseError> {
+
   let mut tmask: i32 = 0;
 
-  let (val, remain) = strtoi(s, 0);
-
+  let (val, remain) = unsafe { strtoi(s)? };
   if remain.is_some() && remain.unwrap()[0] == b'.' {
 
   } else if remain.is_some() {
@@ -579,6 +586,83 @@ fn decode_number(flen: i32, s: &[u8], has_text_month: bool, fmask: i32)
   unimplemented!()
 }
 
+pub struct TimeMeta {
+
+}
+
+/// decode_number_field()
+///
+/// Interpret numeric string as a concatenated date or time field.
+/// Return a DTK token (>= 0) if successful, a DTERR code (< 0) if not.
+///
+/// Use the context of previously decoded fields to help with
+/// the interpretation.
+fn decode_number_field(len: usize, s: &[u8], fmask: i32) -> Result<i32, DateTimeParseError> {
+
+  let mut int_part_len = len;
+  let mut fsec: i64 = 0;
+  let mut tmask: i32 = 0;
+  let mut is2digits = false;
+
+  let tm_mday;
+  let tm_mon;
+  let tm_year;
+  let tm_sec;
+  let tm_min;
+  let tm_hour;
+
+  let decimal_point_idx = s.iter().position(|&c| c == b'.');
+	// Have a decimal point? Then this is a date or something with a seconds
+	// field...
+  if let Some(idx) = decimal_point_idx {
+		 // Can we use ParseFractionalSecond here?  Not clear whether trailing
+		 // junk should be rejected ...
+     let (frac, remaion) = unsafe { strtod(&s[idx..])? };
+     fsec = (frac * 1000000f64).round() as i64;
+     /* Now truncate off the fraction for further processing */
+     int_part_len = idx - 1;
+
+  // No decimal point and no complete date yet?
+  } else if (fmask & DTK_DATE_M) != DTK_DATE_M {
+
+    // yyyymmdd or yymmdd
+    if len >= 6 {
+      let len = len;
+      tmask = DTK_DATE_M;
+      tm_mon = unsafe { i32::from_bytes(&s[(len - 2)..])? };
+      tm_mday = unsafe { i32::from_bytes(&s[(len - 4)..(len - 2)])? };
+      tm_year = unsafe { i32::from_bytes(&s[..(len-4)])? };
+
+      if ((len - 4) == 2) {
+        is2digits = true;
+      }
+
+      return Ok(DTK_DATE);
+    }
+  }
+
+  /* not all time fields are specified? */
+  if fmask & DTK_TIME_M != DTK_TIME_M {
+
+		if (len == 6) { /* hhmmss */
+      tmask = DTK_TIME_M;
+      tm_sec = unsafe { i32::from_bytes(&s[4..])? };
+      tm_min = unsafe { i32::from_bytes(&s[2..4])? };
+      tm_hour = unsafe { i32::from_bytes(&s[0..2])? };
+      return Ok(DTK_TIME);
+
+    } else if len == 4 { /* hhmm? */
+      tmask = DTK_TIME_M;
+			tm_sec = 0;
+			tm_min = unsafe { i32::from_bytes(&s[2..])? };
+			tm_hour = unsafe { i32::from_bytes(&s[..2])? };
+      return Ok(DTK_TIME)
+    }
+  }
+
+  Err(DateTimeParseError::BadFormat(format!("")))
+}
+
 /// Parse a string to a timezone in seconds.
 pub fn decode_timezone(tzstr: &str) -> Result<i32, DateTimeParseError> {
   let buf = tzstr.as_bytes();
@@ -593,17 +677,17 @@ pub fn decode_timezone(tzstr: &str) -> Result<i32, DateTimeParseError> {
       format!("leading characer in timezone must be '+' or '-': '{}'", tzstr)));
   }
 
-  let r = strtoi(buf, 1);
+  let r = unsafe { strtoi(&buf[1..])? };
   hr = r.0;
   remains = r.1;
 
   if remains.is_some() && remains.unwrap()[0] == b':' {
-    let r = strtoi(remains.unwrap(), 1);
+    let r = unsafe { strtoi(&remains.unwrap()[1..])? };
     min = r.0;
     remains = r.1;
 
     if remains.is_some() && remains.unwrap()[0] == b':' {
-      let r = strtoi(remains.unwrap(), 1);
+      let r = unsafe { strtoi(&remains.unwrap()[1..])? };
       sec = r.0;
       remains = r.1;
     }
