@@ -185,6 +185,18 @@ const MAXDATEFIELDS  :usize	= 25;
 // ---------------------------------------------------------------------------
 // Ported from Timestamp.h
 // ---------------------------------------------------------------------------
+
+pub type Timestamp   = i64;
+pub type TimestampTz = i64;
+pub type TimeOffset  = i64;
+pub type FracSec     = i32;
+
+pub struct Interval {
+  time: TimeOffset,
+  day: i32,
+  month: i32
+}
+
 const MAX_TIMESTAMP_PRECISION :i32 = 6;
 const MAX_INTERVAL_PRECISION  :i32 = 6;
 
@@ -587,29 +599,31 @@ fn decode_number(flen: i32, s: &[u8], has_text_month: bool, fmask: i32)
 }
 
 pub struct TimeMeta {
-
+  tm_sec: i32,
+	tm_min: i32,
+	tm_hour: i32,
+	tm_mday: i32,
+  /// origin 0, not 1
+	tm_mon: i32,
+  /// relative to 1900
+	tm_year: i32,
+	tm_wday: i32,
+	tm_yday: i32,
+	tm_isdst: i32,
+	tm_gmtoff: i64,
+	tm_zone: Option<&'static str>
 }
 
 /// decode_number_field()
 ///
 /// Interpret numeric string as a concatenated date or time field.
-/// Return a DTK token (>= 0) if successful, a DTERR code (< 0) if not.
+/// Return a DTK token if successful, a DateTimeParseError if error.
 ///
 /// Use the context of previously decoded fields to help with
 /// the interpretation.
-fn decode_number_field(len: usize, s: &[u8], fmask: i32) -> Result<i32, DateTimeParseError> {
-
-  let mut int_part_len = len;
-  let mut fsec: i64 = 0;
-  let mut tmask: i32 = 0;
-  let mut is2digits = false;
-
-  let tm_mday;
-  let tm_mon;
-  let tm_year;
-  let tm_sec;
-  let tm_min;
-  let tm_hour;
+fn decode_number_field(mut len: usize, s: &[u8], fmask: i32, tmask: &mut i32,
+                      fsec: &mut FracSec, tm: &mut TimeMeta,
+                      is2digits: &mut bool) -> Result<i32, DateTimeParseError> {
 
   let decimal_point_idx = s.iter().position(|&c| c == b'.');
 	// Have a decimal point? Then this is a date or something with a seconds
@@ -618,23 +632,22 @@ fn decode_number_field(len: usize, s: &[u8], fmask: i32) -> Result<i32, DateTime
 		 // Can we use ParseFractionalSecond here?  Not clear whether trailing
 		 // junk should be rejected ...
      let (frac, remaion) = unsafe { strtod(&s[idx..])? };
-     fsec = (frac * 1000000f64).round() as i64;
+     *fsec = (frac * 1000000f64).round() as i32;
      /* Now truncate off the fraction for further processing */
-     int_part_len = idx - 1;
+     len = idx - 1;
 
   // No decimal point and no complete date yet?
   } else if (fmask & DTK_DATE_M) != DTK_DATE_M {
 
     // yyyymmdd or yymmdd
     if len >= 6 {
-      let len = len;
-      tmask = DTK_DATE_M;
-      tm_mon = unsafe { i32::from_bytes(&s[(len - 2)..])? };
-      tm_mday = unsafe { i32::from_bytes(&s[(len - 4)..(len - 2)])? };
-      tm_year = unsafe { i32::from_bytes(&s[..(len-4)])? };
+      *tmask = DTK_DATE_M;
+      tm.tm_mon = unsafe { i32::from_bytes(&s[(len - 2)..])? };
+      tm.tm_mday = unsafe { i32::from_bytes(&s[(len - 4)..(len - 2)])? };
+      tm.tm_year = unsafe { i32::from_bytes(&s[..(len-4)])? };
 
-      if ((len - 4) == 2) {
-        is2digits = true;
+      if (len - 4) == 2 {
+        *is2digits = true;
       }
 
       return Ok(DTK_DATE);
@@ -644,18 +657,20 @@ fn decode_number_field(len: usize, s: &[u8], fmask: i32) -> Result<i32, DateTime
   /* not all time fields are specified? */
   if fmask & DTK_TIME_M != DTK_TIME_M {
 
-		if (len == 6) { /* hhmmss */
-      tmask = DTK_TIME_M;
-      tm_sec = unsafe { i32::from_bytes(&s[4..])? };
-      tm_min = unsafe { i32::from_bytes(&s[2..4])? };
-      tm_hour = unsafe { i32::from_bytes(&s[0..2])? };
+		if len == 6 { /* hhmmss */
+      *tmask = DTK_TIME_M;
+      tm.tm_sec = unsafe { i32::from_bytes(&s[4..])? };
+      tm.tm_min = unsafe { i32::from_bytes(&s[2..4])? };
+      tm.tm_hour = unsafe { i32::from_bytes(&s[0..2])? };
+
       return Ok(DTK_TIME);
 
     } else if len == 4 { /* hhmm? */
-      tmask = DTK_TIME_M;
-			tm_sec = 0;
-			tm_min = unsafe { i32::from_bytes(&s[2..])? };
-			tm_hour = unsafe { i32::from_bytes(&s[..2])? };
+      *tmask = DTK_TIME_M;
+			tm.tm_sec = 0;
+			tm.tm_min = unsafe { i32::from_bytes(&s[2..])? };
+			tm.tm_hour = unsafe { i32::from_bytes(&s[..2])? };
+
       return Ok(DTK_TIME)
     }
   }
