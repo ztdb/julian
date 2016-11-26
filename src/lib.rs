@@ -231,6 +231,26 @@ const USECS_PER_SEC    :i64 = 1000000;
 const MAX_TZDISP_HOUR  : i32 = 15;
 
 // ---------------------------------------------------------------------------
+// Ported from pgtime.h
+// ---------------------------------------------------------------------------
+
+pub struct TimeMeta {
+  tm_sec: i32,
+	tm_min: i32,
+	tm_hour: i32,
+	tm_mday: i32,
+  /// origin 0, not 1
+	tm_mon: i32,
+  /// relative to 1900
+	tm_year: i32,
+	tm_wday: i32,
+	tm_yday: i32,
+	tm_isdst: i32,
+	tm_gmtoff: i64,
+	tm_zone: Option<&'static str>
+}
+
+// ---------------------------------------------------------------------------
 // Ported from datetime.c
 // ---------------------------------------------------------------------------
 
@@ -562,23 +582,33 @@ pub fn decode_date(s: &[u8], fmask: i32) -> Result<(i32, bool, i32, i32, i32), D
   unimplemented!()
 }
 
-/// return tmask, fsec, is2digits
-fn decode_number(flen: i32, s: &[u8], has_text_month: bool, fmask: i32)
-    -> Result<(i32, i64, bool), DateTimeParseError> {
-
-  let mut tmask: i32 = 0;
+/// DecodeNumber()
+/// Interpret plain numeric field as a date value in context.
+/// Return () if okay, a DateTimeParseError code if not.
+fn decode_number(flen: usize, s: &[u8], has_text_month: bool, fmask: i32,
+    tmask: &mut i32, tm: &mut TimeMeta, fsec: &mut FracSec, is2digits: &mut bool)
+    -> Result<(), DateTimeParseError> {
 
   let (val, remain) = unsafe { strtoi(s)? };
+
   if remain.is_some() && remain.unwrap()[0] == b'.' {
+    let remain = remain.unwrap();
+
+    if (s.len() - remain.len()) > 2 {
+      decode_number_field(flen, s, (fmask | DTK_DATE_M), tmask, tm, fsec, is2digits)?;
+      return Ok(());
+    }
 
   } else if remain.is_some() {
-    // error case
+    return Err(DateTimeParseError::BadFormat(
+      format!("invalid number format: '{}'",
+        unsafe { str::from_utf8_unchecked(s) } )));
   }
 
   // Special case for day of year
   if flen == 3 && (fmask & DTK_DATE_M) == DTK_M(YEAR) &&
      val > 1 && val <= 366 {
-    tmask = (DTK_M(DOY) | DTK_M(MONTH) | DTK_M(DAY));
+    *tmask = (DTK_M(DOY) | DTK_M(MONTH) | DTK_M(DAY));
     // tm->tm_yday = val;
     // return succhess
   }
@@ -598,22 +628,6 @@ fn decode_number(flen: i32, s: &[u8], has_text_month: bool, fmask: i32)
   unimplemented!()
 }
 
-pub struct TimeMeta {
-  tm_sec: i32,
-	tm_min: i32,
-	tm_hour: i32,
-	tm_mday: i32,
-  /// origin 0, not 1
-	tm_mon: i32,
-  /// relative to 1900
-	tm_year: i32,
-	tm_wday: i32,
-	tm_yday: i32,
-	tm_isdst: i32,
-	tm_gmtoff: i64,
-	tm_zone: Option<&'static str>
-}
-
 /// decode_number_field()
 ///
 /// Interpret numeric string as a concatenated date or time field.
@@ -622,12 +636,12 @@ pub struct TimeMeta {
 /// Use the context of previously decoded fields to help with
 /// the interpretation.
 fn decode_number_field(mut len: usize, s: &[u8], fmask: i32, tmask: &mut i32,
-                      fsec: &mut FracSec, tm: &mut TimeMeta,
+                      tm: &mut TimeMeta, fsec: &mut FracSec,
                       is2digits: &mut bool) -> Result<i32, DateTimeParseError> {
 
-  let decimal_point_idx = s.iter().position(|&c| c == b'.');
-	// Have a decimal point? Then this is a date or something with a seconds
+  // Have a decimal point? Then this is a date or something with a seconds
 	// field...
+  let decimal_point_idx = s.iter().position(|&c| c == b'.');
   if let Some(idx) = decimal_point_idx {
 		 // Can we use ParseFractionalSecond here?  Not clear whether trailing
 		 // junk should be rejected ...
