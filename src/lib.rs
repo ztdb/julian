@@ -9,6 +9,18 @@ use std::str::{self, FromStr};
 use radish::err::ParseNumErr;
 use radish::ascii::{FromBytes, isalnum, isalpha, isdigit, strtod, strtoi};
 
+
+
+// Date Orders
+#[derive(PartialEq)]
+pub enum DateOrder {
+  YMD,
+  DMY,
+  MDY
+}
+
+pub static DATE_ORDER: DateOrder = DateOrder::YMD;
+
 // ---------------------------------------------------------------------------
 // Ported from datetime.h
 // ---------------------------------------------------------------------------
@@ -697,23 +709,111 @@ fn decode_number(flen: usize, s: &[u8], has_text_month: bool, fmask: &mut i32,
   if flen == 3 && (*fmask & DTK_DATE_M) == DTK_M(YEAR) &&
      val > 1 && val <= 366 {
     *tmask = (DTK_M(DOY) | DTK_M(MONTH) | DTK_M(DAY));
-    // tm->tm_yday = val;
-    // return succhess
+    tm.tm_yday = val;
+    return Ok(())
   }
 
   /* Switch based on what we have so far */
 	match *fmask & DTK_DATE_M {
-    0 => {}
-    DTK_YEAR_M => {}
-    DTK_MONTH_M => {}
-    DTK_YEAR_MONTH_M => {}
-    DTK_DAY_M => {}
-    DTK_MONTH_DAY_M => {}
-    DTK_DATE_M => {}
-    _ => return Err(DateTimeParseError::BadFormat(format!("..")))
+    0 => {
+      
+			 // Nothing so far; make a decision about what we think the input
+			 // is. There used to be lots of heuristics here, but the
+			 // consensus now is to be paranoid.  It *must* be either
+			 // YYYY-MM-DD (with a more-than-two-digit year field), or the
+			 // field order defined by DATE_ORDER.
+       if flen >= 3 {
+         *tmask = DTK_M(YEAR);
+         tm.tm_year = val;
+       } else {
+         match DATE_ORDER {
+           DateOrder::YMD => {
+             *tmask = DTK_M(YEAR);
+             tm.tm_year = val;
+           }
+           DateOrder::DMY => {
+             *tmask = DTK_M(DAY);
+             tm.tm_mday = val;
+           }
+           DateOrder::MDY => {
+             *tmask = DTK_M(MONTH);
+             tm.tm_mon = val;
+           }
+         } 
+       }       			
+    }
+    DTK_YEAR_M => {
+      // Must be at second field of YY-MM-DD
+      *tmask = DTK_M(MONTH);
+			tm.tm_mon = val;
+    }
+    DTK_MONTH_M => {
+      if has_text_month {
+			  // We are at the first numeric field of a date that included a
+			  // textual month name.  We want to support the variants
+			  // MON-DD-YYYY, DD-MON-YYYY, and YYYY-MON-DD as unambiguous
+			  // inputs.  We will also accept MON-DD-YY or DD-MON-YY in
+			  // either DMY or MDY modes, as well as YY-MON-DD in YMD mode.
+			  if flen >= 3 || DATE_ORDER == DateOrder::YMD {
+          *tmask = DTK_M(YEAR);
+          tm.tm_year = val;
+        } else {
+          *tmask = DTK_M(DAY);
+          tm.tm_mday = val;
+        }
+      } else {
+        // Must be at second field of MM-DD-YY
+				*tmask = DTK_M(DAY);
+				tm.tm_mday = val;
+      }
+    }
+    DTK_YEAR_MONTH_M => {
+      if has_text_month {
+				// Need to accept DD-MON-YYYY even in YMD mode
+				if flen >= 3 && *is2digits {
+					// Guess that first numeric field is day was wrong
+          *tmask = DTK_M(DAY);		// YEAR is already set
+          tm.tm_mday = tm.tm_year;
+          tm.tm_year = val;
+          *is2digits = false;
+			  } else {
+			    *tmask = DTK_M(DAY);
+			    tm.tm_mday = val;
+			  }
+			} else {
+				// Must be at third field of YY-MM-DD
+        *tmask = DTK_M(DAY);
+        tm.tm_mday = val;
+			}
+    }
+    DTK_DAY_M => {
+      // Must be at second field of DD-MM-YY
+			*tmask = DTK_M(MONTH);
+			tm.tm_mon = val;
+    }
+    DTK_MONTH_DAY_M => {
+      // Must be at third field of DD-MM-YY or MM-DD-YY
+			*tmask = DTK_M(YEAR);
+			tm.tm_year = val;
+    }
+    DTK_DATE_M => {
+      // we have all the date, so it must be a time field
+			decode_number_field(flen, s, *fmask, tmask, tm, fsec, is2digits)?;
+      return Ok(())
+    }
+    _ => {
+      return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+              unsafe { str::from_utf8_unchecked(s) })));
+    }
   };
 
-  unimplemented!()
+	 // When processing a year field, mark it for adjustment if it's only one
+	 // or two digits.
+	if *tmask == DTK_M(YEAR) {
+		*is2digits = flen <= 2;
+  }
+
+  Ok(())
 }
 
 /// decode_number_field()
