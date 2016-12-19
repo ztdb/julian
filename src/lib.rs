@@ -112,7 +112,7 @@ const UNKNOWN_FIELD :i8 = 31;
 
 // Token field definitions for time parsing and decoding.
 //
-// Some field type codes (see above) use these as the "value" in datetktbl[].
+// Some field type codes (see above) use these as the "value" in DATETK_TBL[].
 // These are also used for bit masks in DecodeDateTime and friends
 //  so actually restrict them to within [0,31] for now.
 // - thomas 97/06/19
@@ -250,6 +250,24 @@ pub struct TimeMeta {
 	tm_zone: Option<&'static str>
 }
 
+impl TimeMeta {
+  pub fn empty() -> TimeMeta {
+    TimeMeta {
+      tm_sec: 0,
+      tm_min: 0,
+      tm_hour: 0,
+      tm_mday: 0,
+      tm_mon: 0,
+      tm_year: 0,
+      tm_wday: 0,
+      tm_yday: 0,
+      tm_isdst: 0,
+      tm_gmtoff: 0,
+      tm_zone: None
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Ported from datetime.c
 // ---------------------------------------------------------------------------
@@ -285,7 +303,7 @@ macro_rules! token {
   }
 }
 
-pub const DATEK_TBL: [DateToken;74] = [
+pub static DATETK_TBL: [DateToken;74] = [
   token!(EARLY, RESERV, DTK_EARLY),
   token!(DA_D, ADBC, AD),                     // "ad" for years > 0
   token!(b"allballs", RESERV, DTK_ZULU),      // 00:00:00
@@ -363,7 +381,7 @@ pub const DATEK_TBL: [DateToken;74] = [
 ];
 
 
-const DELTATK_TBL: [DateToken;63] = [
+static DELTATK_TBL: [DateToken;63] = [
   token!(b"@", IGNORE_DTF, 0),                 // postgres relative prefix
   token!(DAGO, AGO, 0),                        // "ago" indicates negative time offset
   token!(b"c", UNITS, DTK_CENTURY),            // "century" relative
@@ -539,14 +557,27 @@ pub fn parse_fractional_second(s: &str) -> Result<i64, DateTimeParseError> {
   }
 }
 
-/// return (tmask, is2year, year, month, day)
-pub fn decode_date(s: &[u8], fmask: i32) -> Result<(i32, bool, i32, i32, i32), DateTimeParseError> {
+/// Decode date string which includes delimiters.
+/// Return () if okay, a DateTimeParseError if not.
+/// * str: field to be parsed
+/// * fmask: bitmask for field types already seen
+/// * tmask: receives bitmask for fields found here
+/// * is2digits: set to TRUE if we find 2-digit year
+/// * tm: field values are stored into appropriate members of this struct
+pub fn decode_date(s: &[u8], fmask: &mut i32, tmask: &mut i32, is2digits: &mut bool, 
+    tm: &mut TimeMeta) -> Result<(), DateTimeParseError> {
+
   let len = s.len();
   let mut idx = 0;
+  let mut dmask: i32 = 0;
   let mut fields: Vec<&[u8]> = Vec::with_capacity(MAXDATEFIELDS);
+  let mut has_text_month = false;
+  let mut fields_identified: [bool;8] = unsafe { ::std::mem::zeroed() };
 
+  // parse this string...
   while idx < len && fields.len() < MAXDATEFIELDS {
 
+    // skip field separators
     while idx < len && !isalnum(s[idx]) {
       idx += 1;
     }
@@ -569,23 +600,80 @@ pub fn decode_date(s: &[u8], fmask: i32) -> Result<(i32, bool, i32, i32, i32), D
     fields.push(&s[field_start_idx .. idx]);
   }
 
+  // look first for text fields, since that will be unambiguous month
   for i in 0..fields.len() {
-    if isalpha(fields[0][0]) {
-      // ...
+     
+     if isalpha(fields[i][0]) {       
+       
+       if let Some(datetk) = datebsearch(fields[i], &DATETK_TBL) {
+         let ty = datetk.ty;         
+         if ty == IGNORE_DTF {
+           continue;
+         }
+
+         dmask = DTK_M(ty);
+         match ty {
+           MONTH => {
+             tm.tm_mon = datetk.value;
+             has_text_month = true;             
+           }
+           _ => {
+             return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+              unsafe { str::from_utf8_unchecked(s) })));
+           }
+         };
+
+         if (*fmask & dmask) != 0 {
+				  return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+              unsafe { str::from_utf8_unchecked(s) })));
+         }
+
+         *fmask = *fmask | dmask;
+			   *tmask = *tmask | dmask;
+         
+       } else {
+         return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+          unsafe { str::from_utf8_unchecked(s) })));
+       }
+
+       fields_identified[i] = true;
+     }
+  }
+
+  for i in 0..fields.len() {
+    if fields_identified[i] {
+      continue;
     }
+
+    let len = fields[i].len();
+    if len <= 0 {
+      return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+          unsafe { str::from_utf8_unchecked(s) })));
+    }
+
+    decode_number(len, fields[i], has_text_month, fmask, &mut dmask, tm, &mut 0, is2digits)?;
+
+    if (*fmask & dmask) != 0 {
+			return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+          unsafe { str::from_utf8_unchecked(s) })));
+    }
+
+		*fmask = *fmask | dmask;
+		*tmask = *tmask | dmask;
   }
 
-  for i in 0..fields.len() {
-
+  if (*fmask & !(DTK_M(DOY) | DTK_M(TZ))) != DTK_DATE_M {
+    return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+          unsafe { str::from_utf8_unchecked(s) })));
   }
 
-  unimplemented!()
+  Ok(())
 }
 
 /// DecodeNumber()
 /// Interpret plain numeric field as a date value in context.
 /// Return () if okay, a DateTimeParseError code if not.
-fn decode_number(flen: usize, s: &[u8], has_text_month: bool, fmask: i32,
+fn decode_number(flen: usize, s: &[u8], has_text_month: bool, fmask: &mut i32,
     tmask: &mut i32, tm: &mut TimeMeta, fsec: &mut FracSec, is2digits: &mut bool)
     -> Result<(), DateTimeParseError> {
 
@@ -595,7 +683,7 @@ fn decode_number(flen: usize, s: &[u8], has_text_month: bool, fmask: i32,
     let remain = remain.unwrap();
 
     if (s.len() - remain.len()) > 2 {
-      decode_number_field(flen, s, (fmask | DTK_DATE_M), tmask, tm, fsec, is2digits)?;
+      decode_number_field(flen, s, (*fmask | DTK_DATE_M), tmask, tm, fsec, is2digits)?;
       return Ok(());
     }
 
@@ -606,7 +694,7 @@ fn decode_number(flen: usize, s: &[u8], has_text_month: bool, fmask: i32,
   }
 
   // Special case for day of year
-  if flen == 3 && (fmask & DTK_DATE_M) == DTK_M(YEAR) &&
+  if flen == 3 && (*fmask & DTK_DATE_M) == DTK_M(YEAR) &&
      val > 1 && val <= 366 {
     *tmask = (DTK_M(DOY) | DTK_M(MONTH) | DTK_M(DAY));
     // tm->tm_yday = val;
@@ -614,7 +702,7 @@ fn decode_number(flen: usize, s: &[u8], has_text_month: bool, fmask: i32,
   }
 
   /* Switch based on what we have so far */
-	match fmask & DTK_DATE_M {
+	match *fmask & DTK_DATE_M {
     0 => {}
     DTK_YEAR_M => {}
     DTK_MONTH_M => {}
@@ -792,6 +880,19 @@ mod tests {
   use super::DateTimeParseError::*;
 
   #[test]
+  fn test_decode_date() {
+    let mut tmask: i32 = 0;
+    let mut fmask: i32 = 0;
+    let mut is2digits: bool = false;
+    let mut tm = TimeMeta::empty();
+    decode_date("Feb-7-1997".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
+    decode_date("2-7-1997".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
+    decode_date("1997-2-7".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
+    decode_date("1997.038".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
+
+  }
+
+  #[test]
   fn test_parse_fractional_second() {
     assert_eq!(12345000000i64, parse_fractional_second(".12345").ok().unwrap());
   }
@@ -837,10 +938,10 @@ mod tests {
 
   #[test]
   fn test_datebsearch() {
-    assert_eq!(b"april", datebsearch(b"april", &DATEK_TBL).unwrap().token);
-    assert_eq!(b"monday", datebsearch(b"monday", &DATEK_TBL).unwrap().token);
-    assert_eq!(b"friday", datebsearch(b"friday", &DATEK_TBL).unwrap().token);
+    assert_eq!(b"april", datebsearch(b"april", &DATETK_TBL).unwrap().token);
+    assert_eq!(b"monday", datebsearch(b"monday", &DATETK_TBL).unwrap().token);
+    assert_eq!(b"friday", datebsearch(b"friday", &DATETK_TBL).unwrap().token);
 
-    assert!(datebsearch(b"not_found", &DATEK_TBL).is_none());
+    assert!(datebsearch(b"not_found", &DATETK_TBL).is_none());
   }
 }
