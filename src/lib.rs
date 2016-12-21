@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use std::str::{self, FromStr};
 
 use radish::err::ParseNumErr;
-use radish::ascii::{FromBytes, isalnum, isalpha, isdigit, strtod, strtoi};
+use radish::ascii::{FromBytes, isalnum, isalpha, isdigit, strtod, strtoi, tolower};
 
 
 
@@ -246,6 +246,7 @@ const MAX_TZDISP_HOUR  : i32 = 15;
 // Ported from pgtime.h
 // ---------------------------------------------------------------------------
 
+#[derive(Debug)]
 pub struct TimeMeta {
   tm_sec: i32,
 	tm_min: i32,
@@ -612,12 +613,16 @@ pub fn decode_date(s: &[u8], fmask: &mut i32, tmask: &mut i32, is2digits: &mut b
     fields.push(&s[field_start_idx .. idx]);
   }
 
+  for i in 0..fields.len() {
+    println!("fields[{}]=\"{}\"", i, unsafe { str::from_utf8_unchecked(fields[i]) });
+  }
+
   // look first for text fields, since that will be unambiguous month
   for i in 0..fields.len() {
      
      if isalpha(fields[i][0]) {       
        
-       if let Some(datetk) = datebsearch(fields[i], &DATETK_TBL) {
+       if let Some(datetk) = datebsearch(tolower(fields[i]).as_slice(), &DATETK_TBL) {
          let ty = datetk.ty;         
          if ty == IGNORE_DTF {
            continue;
@@ -630,13 +635,13 @@ pub fn decode_date(s: &[u8], fmask: &mut i32, tmask: &mut i32, is2digits: &mut b
              has_text_month = true;             
            }
            _ => {
-             return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+             return Err(DateTimeParseError::BadFormat(format!("1 bad date format: '{}'",
               unsafe { str::from_utf8_unchecked(s) })));
            }
          };
 
          if (*fmask & dmask) != 0 {
-				  return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+				  return Err(DateTimeParseError::BadFormat(format!("2 bad date format: '{}'",
               unsafe { str::from_utf8_unchecked(s) })));
          }
 
@@ -644,7 +649,7 @@ pub fn decode_date(s: &[u8], fmask: &mut i32, tmask: &mut i32, is2digits: &mut b
 			   *tmask = *tmask | dmask;
          
        } else {
-         return Err(DateTimeParseError::BadFormat(format!("bad date format: '{}'",
+         return Err(DateTimeParseError::BadFormat(format!("3 bad date format: '{}'",
           unsafe { str::from_utf8_unchecked(s) })));
        }
 
@@ -653,8 +658,14 @@ pub fn decode_date(s: &[u8], fmask: &mut i32, tmask: &mut i32, is2digits: &mut b
   }
 
   for i in 0..fields.len() {
+    println!("all fields parsed...");
+  }
+  for i in 0..fields.len() {
     if fields_identified[i] {
+      println!("fields_identified[{}]=true", i);
       continue;
+    } else {
+      println!("fields_identified[{}]=false", i);
     }
 
     let len = fields[i].len();
@@ -682,7 +693,6 @@ pub fn decode_date(s: &[u8], fmask: &mut i32, tmask: &mut i32, is2digits: &mut b
   Ok(())
 }
 
-/// DecodeNumber()
 /// Interpret plain numeric field as a date value in context.
 /// Return () if okay, a DateTimeParseError code if not.
 fn decode_number(flen: usize, s: &[u8], has_text_month: bool, fmask: &mut i32,
@@ -979,17 +989,28 @@ mod tests {
   use super::*;
   use super::DateTimeParseError::*;
 
-  #[test]
-  fn test_decode_date() {
+  fn assert_decode_date(s: &str, year: i32, month: i32, day: i32, is2digity: bool) {
     let mut tmask: i32 = 0;
     let mut fmask: i32 = 0;
     let mut is2digits: bool = false;
     let mut tm = TimeMeta::empty();
-    decode_date("Feb-7-1997".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
-    decode_date("2-7-1997".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
-    decode_date("1997-2-7".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
-    decode_date("1997.038".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
+    decode_date(s.as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm).ok().unwrap();
+    println!("{:?}", tm);
+    assert_eq!(tm.tm_year, year);
+    assert_eq!(tm.tm_mon, month);
+    assert_eq!(tm.tm_mday, day);
+    assert_eq!(is2digits, is2digity);
+  }
 
+  #[test]
+  fn test_decode_date() {
+    assert_decode_date("Feb-7-1997", 1997, 2, 7, false);
+    assert_decode_date("2-7-1997", 1997, 2, 7, false);
+    assert_decode_date("1997-2-7", 1997, 2, 7, false);
+    //decode_date("Feb-7-1997".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
+    //decode_date("2-7-1997".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
+    //decode_date("1997-2-7".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
+    //decode_date("1997.038".as_bytes(), &mut tmask, &mut fmask, &mut is2digits, &mut tm);
   }
 
   #[test]
